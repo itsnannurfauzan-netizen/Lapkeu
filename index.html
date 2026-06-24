@@ -404,71 +404,79 @@ function categorize(ket){
   return 'Lainnya';
 }
 
-const hasStorage = () => typeof window !== 'undefined' && window.storage && typeof window.storage.get === 'function';
+const hasNativeStorage = () => typeof window !== 'undefined' && window.storage && typeof window.storage.get === 'function';
+const hasLocalStorage = () => { try{ return typeof localStorage !== 'undefined' && localStorage !== null; }catch(e){ return false; } };
+
+async function storeGet(key){
+  if(hasNativeStorage()){
+    try{ const r = await window.storage.get(key, false); return (r && r.value) || null; }catch(e){ return null; }
+  }
+  if(hasLocalStorage()){ try{ return localStorage.getItem(key); }catch(e){ return null; } }
+  return null;
+}
+async function storeSet(key, value){
+  if(hasNativeStorage()){
+    try{ await window.storage.set(key, value, false); return true; }catch(e){ /* fall through */ }
+  }
+  if(hasLocalStorage()){ try{ localStorage.setItem(key, value); return true; }catch(e){ return false; } }
+  return false;
+}
+async function storeDelete(key){
+  if(hasNativeStorage()){ try{ await window.storage.delete(key, false); }catch(e){} }
+  if(hasLocalStorage()){ try{ localStorage.removeItem(key); }catch(e){} }
+}
+async function storeListPrefix(prefix){
+  if(hasNativeStorage()){
+    try{ const r = await window.storage.list(prefix, false); return (r && r.keys) || []; }catch(e){ return []; }
+  }
+  if(hasLocalStorage()){
+    try{
+      const keys = [];
+      for(let i=0;i<localStorage.length;i++){ const k = localStorage.key(i); if(k && k.indexOf(prefix)===0) keys.push(k); }
+      return keys;
+    }catch(e){ return []; }
+  }
+  return [];
+}
 
 async function loadKasList(){
-  if(hasStorage()){
-    try{
-      const res = await window.storage.get(KAS_LIST_KEY, false);
-      if(res && res.value) kasList = JSON.parse(res.value);
-      else throw new Error('empty');
-    }catch(e){
-      kasList = [{id: DEFAULT_KAS_ID, name: 'Kantong Survey'}];
-      try{ await window.storage.set(KAS_LIST_KEY, JSON.stringify(kasList), false); }catch(e2){}
-    }
-    try{
-      const res2 = await window.storage.get(ACTIVE_KAS_KEY, false);
-      activeKasId = res2 && res2.value ? JSON.parse(res2.value) : DEFAULT_KAS_ID;
-    }catch(e){ activeKasId = DEFAULT_KAS_ID; }
+  const raw = await storeGet(KAS_LIST_KEY);
+  if(raw){
+    try{ kasList = JSON.parse(raw); }catch(e){ kasList = [{id: DEFAULT_KAS_ID, name: 'Kantong Survey'}]; }
   } else {
     kasList = [{id: DEFAULT_KAS_ID, name: 'Kantong Survey'}];
-    activeKasId = DEFAULT_KAS_ID;
+    await storeSet(KAS_LIST_KEY, JSON.stringify(kasList));
   }
+  const rawActive = await storeGet(ACTIVE_KAS_KEY);
+  activeKasId = rawActive ? JSON.parse(rawActive) : DEFAULT_KAS_ID;
   if(!kasList.find(k=>k.id===activeKasId)) activeKasId = (kasList[0] && kasList[0].id) || DEFAULT_KAS_ID;
 }
 
-async function persistKasList(){
-  if(!hasStorage()) return;
-  try{ await window.storage.set(KAS_LIST_KEY, JSON.stringify(kasList), false); }catch(e){}
-}
-async function persistActiveKasId(){
-  if(!hasStorage()) return;
-  try{ await window.storage.set(ACTIVE_KAS_KEY, JSON.stringify(activeKasId), false); }catch(e){}
-}
+async function persistKasList(){ await storeSet(KAS_LIST_KEY, JSON.stringify(kasList)); }
+async function persistActiveKasId(){ await storeSet(ACTIVE_KAS_KEY, JSON.stringify(activeKasId)); }
 
 async function loadData(){
   // Default kas falls back to the original seeded data; other kas start empty.
   transactions = activeKasId===DEFAULT_KAS_ID ? SEED.map((t,i)=>({id:'t'+i, ...t})) : [];
   saldoJago = activeKasId===DEFAULT_KAS_ID ? 3733700 : 0;
 
-  if(hasStorage()){
-    try{
-      const res = await window.storage.get(storeKeyFor(activeKasId), false);
-      if(res && res.value) transactions = JSON.parse(res.value);
-    }catch(e){
-      try{ await window.storage.set(storeKeyFor(activeKasId), JSON.stringify(transactions), false); }catch(e2){}
-    }
-    try{
-      const res2 = await window.storage.get(saldoJagoKeyFor(activeKasId), false);
-      if(res2 && res2.value) saldoJago = JSON.parse(res2.value);
-    }catch(e){
-      try{ await window.storage.set(saldoJagoKeyFor(activeKasId), JSON.stringify(saldoJago), false); }catch(e2){}
-    }
-  }
+  const rawTx = await storeGet(storeKeyFor(activeKasId));
+  if(rawTx){ try{ transactions = JSON.parse(rawTx); }catch(e){} }
+  else { await storeSet(storeKeyFor(activeKasId), JSON.stringify(transactions)); }
+
+  const rawSaldo = await storeGet(saldoJagoKeyFor(activeKasId));
+  if(rawSaldo){ try{ saldoJago = JSON.parse(rawSaldo); }catch(e){} }
+  else { await storeSet(saldoJagoKeyFor(activeKasId), JSON.stringify(saldoJago)); }
+
   renderKasBar();
   render();
 }
 
 async function persist(){
-  if(!hasStorage()) return;
-  try{ await window.storage.set(storeKeyFor(activeKasId), JSON.stringify(transactions), false); }
-  catch(e){ toast('Tersimpan di sesi ini saja (penyimpanan tidak tersedia)'); }
+  const ok = await storeSet(storeKeyFor(activeKasId), JSON.stringify(transactions));
+  if(!ok) toast('Tersimpan di sesi ini saja (penyimpanan tidak tersedia)');
 }
-async function persistSaldoJago(){
-  if(!hasStorage()) return;
-  try{ await window.storage.set(saldoJagoKeyFor(activeKasId), JSON.stringify(saldoJago), false); }
-  catch(e){}
-}
+async function persistSaldoJago(){ await storeSet(saldoJagoKeyFor(activeKasId), JSON.stringify(saldoJago)); }
 
 function render(){
   const totalIn = transactions.reduce((s,t)=>s+(t.in||0),0);
@@ -571,14 +579,10 @@ async function deleteKas(id){
   const ok = confirm('Hapus kas "'+k.name+'" beserta semua transaksi & fotonya? Tindakan ini tidak bisa dibatalkan.');
   if(!ok) return;
 
-  if(hasStorage()){
-    try{
-      const list = await window.storage.list(id===DEFAULT_KAS_ID ? 'photo:t' : 'photo:'+id+':', false);
-      if(list && list.keys) for(const key of list.keys){ try{ await window.storage.delete(key, false); }catch(e){} }
-    }catch(e){}
-    try{ await window.storage.delete(storeKeyFor(id), false); }catch(e){}
-    try{ await window.storage.delete(saldoJagoKeyFor(id), false); }catch(e){}
-  }
+  const photoKeys = await storeListPrefix(id===DEFAULT_KAS_ID ? 'photo:t' : 'photo:'+id+':');
+  for(const key of photoKeys){ await storeDelete(key); }
+  await storeDelete(storeKeyFor(id));
+  await storeDelete(saldoJagoKeyFor(id));
 
   kasList = kasList.filter(x=>x.id!==id);
   await persistKasList();
@@ -744,14 +748,8 @@ function setPhotoLoading(){
 }
 
 async function loadPhotoForPreview(t){
-  if(hasStorage()){
-    try{
-      const res = await window.storage.get(photoKey(activeKasId, t.id), false);
-      setPhotoPreview(res && res.value ? res.value : null);
-      return;
-    }catch(e){ /* fall through to in-memory */ }
-  }
-  setPhotoPreview(t.photo || null);
+  const photo = await storeGet(photoKey(activeKasId, t.id));
+  setPhotoPreview(photo || t.photo || null);
 }
 
 document.getElementById('fPhotoInput').addEventListener('change', async (e)=>{
@@ -852,22 +850,17 @@ document.getElementById('btnSave').addEventListener('click', async ()=>{
 
   const idx2 = transactions.findIndex(t=>t.id===targetId);
   if(currentPhotoBase64){
-    if(hasStorage()){
-      try{
-        await window.storage.set(photoKey(activeKasId, targetId), currentPhotoBase64, false);
-        transactions[idx2].hasPhoto = true;
-        delete transactions[idx2].photo;
-      }catch(e){
-        transactions[idx2].photo = currentPhotoBase64;
-        transactions[idx2].hasPhoto = true;
-        toast('Foto disimpan di sesi ini saja (penyimpanan tidak tersedia)');
-      }
+    const ok = await storeSet(photoKey(activeKasId, targetId), currentPhotoBase64);
+    if(ok){
+      transactions[idx2].hasPhoto = true;
+      delete transactions[idx2].photo;
     } else {
       transactions[idx2].photo = currentPhotoBase64;
       transactions[idx2].hasPhoto = true;
+      toast('Foto disimpan di sesi ini saja (penyimpanan tidak tersedia)');
     }
   } else if(removePhotoFlag){
-    if(hasStorage()){ try{ await window.storage.delete(photoKey(activeKasId, targetId), false); }catch(e){} }
+    await storeDelete(photoKey(activeKasId, targetId));
     transactions[idx2].hasPhoto = false;
     delete transactions[idx2].photo;
   }
@@ -879,7 +872,7 @@ document.getElementById('btnSave').addEventListener('click', async ()=>{
 
 document.getElementById('btnDelete').addEventListener('click', async ()=>{
   if(!editingId) return;
-  if(hasStorage()){ try{ await window.storage.delete(photoKey(activeKasId, editingId), false); }catch(e){} }
+  await storeDelete(photoKey(activeKasId, editingId));
   transactions = transactions.filter(t=>t.id!==editingId);
   await persist();
   overlay.classList.remove('show');
