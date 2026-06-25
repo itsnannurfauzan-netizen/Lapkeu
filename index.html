@@ -85,6 +85,12 @@
   }
   .stat-box .lbl{font-size:10.5px; color:#9FB3AB; text-transform:uppercase; letter-spacing:.06em;}
   .stat-box .val{font-family:'IBM Plex Mono',monospace; font-weight:600; font-size:15px; margin-top:3px;}
+  .stat-box-wide{
+    margin-top:10px; background:rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.08);
+    border-radius:12px; padding:10px 12px;
+  }
+  .stat-box-wide .lbl{font-size:10.5px; color:#9FB3AB; text-transform:uppercase; letter-spacing:.06em;}
+  .stat-box-wide .val{font-family:'IBM Plex Mono',monospace; font-weight:600; font-size:15px; margin-top:3px; color:#F3EFE3;}
   .stat-sub{font-size:10.5px; margin-top:5px; line-height:1.4; font-family:'IBM Plex Mono',monospace;}
   .stat-sub .ok{color:#8FD6AE;}
   .stat-sub .warn{color:#F0A98A;}
@@ -111,19 +117,15 @@
   .cat-bar{height:4px; background:var(--paper-2); border-radius:3px; margin-top:7px; overflow:hidden;}
   .cat-bar i{display:block; height:100%; background:var(--gold);}
 
-  .cabang-scroll{display:flex; gap:8px; overflow-x:auto; padding-bottom:4px; -ms-overflow-style:none; scrollbar-width:none;}
-  .cabang-scroll::-webkit-scrollbar{display:none;}
-  .cabang-chip{
-    flex:0 0 auto; min-width:128px; background:#fff; border:1px solid var(--line); border-radius:12px;
-    padding:9px 12px; box-shadow:var(--shadow); position:relative; cursor:pointer;
+  .cabang-row{
+    display:flex; align-items:center; justify-content:space-between; gap:10px; padding:10px 4px;
+    border-bottom:1px solid rgba(217,207,184,.5);
   }
-  .cabang-chip .cc-name{font-size:12px; color:var(--ink); font-weight:600; padding-right:14px;}
-  .cabang-chip .cc-amt{font-family:'IBM Plex Mono',monospace; font-size:12.5px; font-weight:600; margin-top:4px; color:var(--green);}
-  .cabang-chip .cc-del{position:absolute; top:7px; right:8px; font-size:10px; color:var(--ink-soft); padding:2px;}
-  .cabang-chip.cabang-add{
-    display:flex; align-items:center; justify-content:center; color:var(--ink-soft); font-weight:600; font-size:12px;
-    background:none; border:1.5px dashed var(--line); box-shadow:none;
-  }
+  .cabang-row:last-child{border-bottom:none;}
+  .cr-name{font-size:13.5px; font-weight:600; color:var(--ink);}
+  .cr-amt{font-family:'IBM Plex Mono',monospace; font-size:12.5px; color:var(--green); margin-top:2px;}
+  .cr-del{background:none; border:none; color:var(--red); font-weight:600; font-size:12px; cursor:pointer; font-family:'Inter',sans-serif; padding:6px 4px;}
+  .cabang-empty{font-size:12px; color:var(--ink-soft); padding:8px 4px;}
 
   /* search & filter */
   .toolbar{display:flex; gap:8px; margin-top:4px;}
@@ -300,8 +302,6 @@
     .kas-bar{ flex-wrap:wrap; }
     .cat-scroll{ flex-wrap:wrap; overflow-x:visible; }
     .cat-card{ flex:1 1 160px; min-width:160px; }
-    .cabang-scroll{ flex-wrap:wrap; overflow-x:visible; }
-    .cabang-chip{ flex:1 1 160px; min-width:160px; }
     .footer-actions{ padding-bottom:36px; }
     .overlay{ align-items:center; background:rgba(20,28,28,.45); }
     .sheet{ max-width:480px; border-radius:18px; animation:popIn .18s ease; }
@@ -392,12 +392,14 @@
     </div>
 
     <div class="stat-strip">
-      <div class="stat-box">
-        <div class="lbl">Total Masuk</div>
-        <div class="val in-col" id="totalIn">Rp 0</div>
-        <div class="stat-sub" id="totalInVsSeharusnya"></div>
-      </div>
+      <div class="stat-box"><div class="lbl">Total Masuk</div><div class="val in-col" id="totalIn">Rp 0</div></div>
       <div class="stat-box"><div class="lbl">Total Keluar</div><div class="val out-col" id="totalOut">Rp 0</div></div>
+    </div>
+
+    <div class="stat-box-wide" id="seharusnyaBox" style="display:none;">
+      <div class="lbl">Dana Survey Seharusnya</div>
+      <div class="val" id="totalSeharusnyaVal">Rp 0</div>
+      <div class="stat-sub" id="totalInVsSeharusnya"></div>
     </div>
   </div>
 
@@ -411,9 +413,8 @@
   </div>
 
   <div class="section">
-    <div class="section-title">Daftar Cabang & Budget Survey <span class="hint">otomatis</span></div>
-    <div class="cabang-scroll" id="cabangScroll"></div>
-    <div id="cabangSummary" style="font-size:12px; color:var(--ink-soft); margin-top:8px; line-height:1.5;"></div>
+    <div class="section-title">Budget Survey per Cabang <span class="hint" id="kelolaCabangLink" style="cursor:pointer;">Kelola Cabang ›</span></div>
+    <div id="cabangSummary" style="font-size:12px; color:var(--ink-soft); line-height:1.5;"></div>
   </div>
 
   <div class="section">
@@ -513,6 +514,18 @@
   <button class="lightbox-close" id="lightboxClose">✕</button>
   <a class="lightbox-dl" id="lightboxDownload" download="bukti.jpg">⬇</a>
   <img id="lightboxImg" src="">
+</div>
+
+<div class="overlay" id="cabangOverlay">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <h3>Kelola Cabang & Budget Survey</h3>
+    <div id="cabangModalList"></div>
+    <div class="sheet-btns">
+      <button class="btn-primary" id="btnAddCabang">+ Tambah Cabang</button>
+    </div>
+    <div style="text-align:center; margin-top:8px;"><button class="btn-danger" id="cabangOverlayClose">Tutup</button></div>
+  </div>
 </div>
 
 <div class="toast" id="toast"></div>
@@ -774,14 +787,16 @@ function render(){
   }
 
   const totalSeharusnyaCabang = cabangList.reduce((s,c)=>s+(c.budget||0),0);
-  const subEl = document.getElementById('totalInVsSeharusnya');
+  const seharusnyaBox = document.getElementById('seharusnyaBox');
   if(!cabangList.length){
-    subEl.innerHTML = '';
+    seharusnyaBox.style.display = 'none';
   } else {
+    seharusnyaBox.style.display = 'block';
+    document.getElementById('totalSeharusnyaVal').textContent = fmt(totalSeharusnyaCabang);
     const diffCabang = totalIn - totalSeharusnyaCabang;
-    const cls = diffCabang===0 ? 'ok' : (diffCabang>0 ? 'ok' : 'warn');
-    const diffTxt = diffCabang===0 ? 'sesuai' : (diffCabang>0 ? '+'+fmt(diffCabang)+' lebih' : fmt(Math.abs(diffCabang))+' kurang');
-    subEl.innerHTML = `Seharusnya ${fmt(totalSeharusnyaCabang)} <span class="${cls}">· ${diffTxt}</span>`;
+    const cls = diffCabang>=0 ? 'ok' : 'warn';
+    const diffTxt = diffCabang===0 ? 'sesuai dengan Total Masuk' : (diffCabang>0 ? '+'+fmt(diffCabang)+' lebih dari Total Masuk' : fmt(Math.abs(diffCabang))+' kurang dari Total Masuk');
+    document.getElementById('totalInVsSeharusnya').innerHTML = `<span class="${cls}">${diffTxt}</span> · dari ${cabangList.length} cabang`;
   }
 
   renderCategories();
@@ -791,25 +806,32 @@ function render(){
 }
 
 function renderCabangSection(totalIn){
-  const wrap = document.getElementById('cabangScroll');
   const totalSeharusnya = cabangList.reduce((s,c)=>s+(c.budget||0),0);
   const selisihCabang = totalIn - totalSeharusnya;
 
-  wrap.innerHTML = cabangList.map(c=>`
-    <div class="cabang-chip" data-id="${c.id}">
-      <span class="cc-del" data-id="${c.id}">✕</span>
-      <div class="cc-name">${escapeHtml(c.name)}</div>
-      <div class="cc-amt">${fmt(c.budget||0)}</div>
-    </div>
-  `).join('') + '<div class="cabang-chip cabang-add" id="addCabangChip">+ Tambah Cabang</div>';
-
   const summary = document.getElementById('cabangSummary');
   if(!cabangList.length){
-    summary.innerHTML = 'Belum ada cabang diinput. Tambahkan cabang untuk menghitung dana masuk yang seharusnya.';
+    summary.innerHTML = 'Belum ada cabang diinput. Tap "Kelola Cabang" untuk menambahkan.';
   } else {
     const diffLabel = selisihCabang===0 ? 'Sesuai' : (selisihCabang>0 ? '+'+fmt(selisihCabang)+' (lebih dari seharusnya)' : fmt(selisihCabang).replace('Rp -','-Rp ')+' (kurang dari seharusnya)');
-    summary.innerHTML = `Total Masuk Seharusnya (${cabangList.length} cabang): <b>${fmt(totalSeharusnya)}</b> · Selisih dari Total Masuk aktual: <b>${diffLabel}</b>`;
+    summary.innerHTML = `${cabangList.length} cabang · Total Seharusnya <b>${fmt(totalSeharusnya)}</b> · Selisih: <b>${diffLabel}</b>`;
   }
+
+  renderCabangModalList();
+}
+
+function renderCabangModalList(){
+  const wrap = document.getElementById('cabangModalList');
+  if(!wrap) return;
+  wrap.innerHTML = cabangList.map(c=>`
+    <div class="cabang-row" data-id="${c.id}">
+      <div class="cr-info">
+        <div class="cr-name">${escapeHtml(c.name)}</div>
+        <div class="cr-amt">${fmt(c.budget||0)}</div>
+      </div>
+      <button type="button" class="cr-del" data-id="${c.id}">Hapus</button>
+    </div>
+  `).join('') || '<div class="cabang-empty">Belum ada cabang. Tambahkan di bawah.</div>';
 }
 
 function renderTalanganSection(){
@@ -965,14 +987,22 @@ async function removeCabang(id){
   toast('Cabang dihapus');
 }
 
-document.getElementById('cabangScroll').addEventListener('click', async (e)=>{
-  const del = e.target.closest('.cc-del');
-  if(del){ e.stopPropagation(); await removeCabang(del.dataset.id); return; }
-  const addChip = e.target.closest('#addCabangChip');
-  if(addChip){ await addCabang(); return; }
-  const chip = e.target.closest('.cabang-chip');
-  if(!chip) return;
-  await editCabang(chip.dataset.id);
+document.getElementById('kelolaCabangLink').addEventListener('click', ()=>{
+  renderCabangModalList();
+  document.getElementById('cabangOverlay').classList.add('show');
+});
+document.getElementById('cabangOverlayClose').addEventListener('click', ()=>{
+  document.getElementById('cabangOverlay').classList.remove('show');
+});
+document.getElementById('cabangOverlay').addEventListener('click', (e)=>{
+  if(e.target.id==='cabangOverlay') e.currentTarget.classList.remove('show');
+});
+document.getElementById('btnAddCabang').addEventListener('click', addCabang);
+document.getElementById('cabangModalList').addEventListener('click', async (e)=>{
+  const del = e.target.closest('.cr-del');
+  if(del){ await removeCabang(del.dataset.id); return; }
+  const row = e.target.closest('.cabang-row');
+  if(row) await editCabang(row.dataset.id);
 });
 
 function applyFilters(){
