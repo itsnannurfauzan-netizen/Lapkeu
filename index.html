@@ -172,26 +172,27 @@
   }
   .overlay.show{display:flex;}
   .sheet{
-    width:100%; max-width:560px; background:var(--paper); border-radius:18px 18px 0 0; padding:18px 20px 28px;
-    max-height:88vh; overflow-y:auto; animation:up .22s ease;
+    width:100%; max-width:560px; background:var(--paper); border-radius:18px 18px 0 0; padding:14px 18px 18px;
+    max-height:92vh; overflow-y:auto; animation:up .22s ease;
   }
   @keyframes up{from{transform:translateY(20px); opacity:.6;} to{transform:translateY(0); opacity:1;}}
-  .sheet-handle{width:36px; height:4px; background:var(--line); border-radius:3px; margin:0 auto 14px;}
-  .sheet h3{font-family:'Fraunces',serif; font-size:18px; margin:0 0 14px;}
-  .field{margin-bottom:12px;}
-  .field label{font-size:11.5px; font-weight:600; color:var(--ink-soft); text-transform:uppercase; letter-spacing:.04em;}
+  .sheet-handle{width:36px; height:4px; background:var(--line); border-radius:3px; margin:0 auto 10px;}
+  .sheet h3{font-family:'Fraunces',serif; font-size:16.5px; margin:0 0 10px;}
+  .field{margin-bottom:8px;}
+  .field-row{display:grid; grid-template-columns:1fr 1fr; gap:8px;}
+  .field label{font-size:10.5px; font-weight:600; color:var(--ink-soft); text-transform:uppercase; letter-spacing:.04em;}
   .field input, .field select, .field textarea{
-    width:100%; margin-top:5px; padding:10px 12px; border:1px solid var(--line); border-radius:9px;
-    font-size:14.5px; font-family:'Inter',sans-serif; background:#fff; color:var(--ink);
+    width:100%; margin-top:4px; padding:8px 10px; border:1px solid var(--line); border-radius:9px;
+    font-size:14px; font-family:'Inter',sans-serif; background:#fff; color:var(--ink);
   }
-  .seg{display:flex; gap:8px; margin-top:5px;}
+  .seg{display:flex; gap:8px; margin-top:4px;}
   .seg button{
-    flex:1; padding:10px; border-radius:9px; border:1px solid var(--line); background:#fff; font-weight:700;
-    font-size:13px; cursor:pointer; color:var(--ink-soft); font-family:'Inter',sans-serif;
+    flex:1; padding:8px; border-radius:9px; border:1px solid var(--line); background:#fff; font-weight:700;
+    font-size:12.5px; cursor:pointer; color:var(--ink-soft); font-family:'Inter',sans-serif;
   }
   .seg button.sel.in{background:var(--green-soft); color:var(--green); border-color:var(--green);}
   .seg button.sel.out{background:var(--red-soft); color:var(--red); border-color:var(--red);}
-  .sheet-btns{display:flex; gap:10px; margin-top:16px;}
+  .sheet-btns{display:flex; gap:10px; margin-top:10px;}
   .btn-primary{
     flex:1; background:var(--ink); color:var(--paper); border:none; border-radius:10px; padding:12px; font-weight:700;
     font-size:13.5px; cursor:pointer; font-family:'Inter',sans-serif;
@@ -208,19 +209,19 @@
 
   /* photo upload */
   .photo-box{
-    margin-top:5px; border:1.5px dashed var(--line); border-radius:10px; background:#fff;
-    display:flex; align-items:center; justify-content:center; min-height:90px; position:relative; overflow:hidden;
+    margin-top:4px; border:1.5px dashed var(--line); border-radius:10px; background:#fff;
+    display:flex; align-items:center; justify-content:center; min-height:40px; position:relative; overflow:hidden;
   }
-  .photo-box.has-img{border-style:solid; min-height:140px;}
-  .photo-box img{width:100%; max-height:220px; object-fit:contain; display:block; cursor:zoom-in;}
-  .photo-placeholder{font-size:12px; color:var(--ink-soft); text-align:center; padding:14px;}
-  .photo-actions{display:flex; gap:8px; margin-top:8px;}
+  .photo-box.has-img{border-style:solid; min-height:120px;}
+  .photo-box img{width:100%; max-height:160px; object-fit:contain; display:block; cursor:zoom-in;}
+  .photo-placeholder{font-size:11.5px; color:var(--ink-soft); text-align:center; padding:8px;}
+  .photo-actions{display:flex; gap:8px; margin-top:6px;}
   .photo-actions label, .photo-actions button, .photo-actions a{
-    flex:1; text-align:center; padding:9px; border-radius:9px; border:1px solid var(--line); background:#fff;
-    font-size:12px; font-weight:600; color:var(--ink-soft); cursor:pointer; font-family:'Inter',sans-serif;
+    flex:1; text-align:center; padding:7px; border-radius:9px; border:1px solid var(--line); background:#fff;
+    font-size:11.5px; font-weight:600; color:var(--ink-soft); cursor:pointer; font-family:'Inter',sans-serif;
   }
   .photo-actions .danger{color:var(--red);}
-  .photo-spin{font-size:12px; color:var(--ink-soft); text-align:center; padding:14px;}
+  .photo-spin{font-size:11.5px; color:var(--ink-soft); text-align:center; padding:8px;}
   .tag.photo{background:var(--green-soft); color:var(--green);}
 
   .lightbox{
@@ -418,18 +419,22 @@
         <button type="button" id="segIn" class="sel">Cash In</button>
       </div>
     </div>
-    <div class="field"><label>Tanggal</label><input type="date" id="fTanggal"></div>
-    <div class="field"><label>Keterangan</label><input type="text" id="fKeterangan" placeholder="mis. Bensin, Makan siang, Reimburs..."></div>
-    <div class="field"><label>Jumlah (Rp)</label><input type="number" id="fJumlah" placeholder="0" inputmode="numeric"></div>
-    <div class="field">
-      <label>Bukti / Bon</label>
-      <select id="fBukti">
-        <option value="Fisik">Fisik</option>
-        <option value="Digital">Digital</option>
-        <option value="Tidak ada">Tidak ada</option>
-      </select>
+    <div class="field-row">
+      <div class="field"><label>Tanggal</label><input type="date" id="fTanggal"></div>
+      <div class="field"><label>Jumlah (Rp)</label><input type="number" id="fJumlah" placeholder="0" inputmode="numeric"></div>
     </div>
-    <div class="field"><label>Catatan / Link (opsional)</label><input type="text" id="fNote" placeholder="Link bukti, nama PIC, dll"></div>
+    <div class="field"><label>Keterangan</label><input type="text" id="fKeterangan" placeholder="mis. Bensin, Makan siang, Reimburs..."></div>
+    <div class="field-row">
+      <div class="field">
+        <label>Bukti / Bon</label>
+        <select id="fBukti">
+          <option value="Fisik">Fisik</option>
+          <option value="Digital">Digital</option>
+          <option value="Tidak ada">Tidak ada</option>
+        </select>
+      </div>
+      <div class="field"><label>Catatan (opsional)</label><input type="text" id="fNote" placeholder="Link bukti, nama PIC, dll"></div>
+    </div>
     <div class="field">
       <label>Foto Bukti</label>
       <div class="photo-box" id="photoBox">
@@ -445,7 +450,7 @@
     <div class="sheet-btns">
       <button class="btn-primary" id="btnSave">Simpan</button>
     </div>
-    <div style="text-align:center; margin-top:10px;"><button class="btn-danger" id="btnDelete" style="display:none;">Hapus transaksi ini</button></div>
+    <div style="text-align:center; margin-top:8px;"><button class="btn-danger" id="btnDelete" style="display:none;">Hapus transaksi ini</button></div>
   </div>
 </div>
 
