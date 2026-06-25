@@ -492,7 +492,20 @@ function categorize(ket){
 
 const hasNativeStorage = () => typeof window !== 'undefined' && window.storage && typeof window.storage.get === 'function';
 const hasLocalStorage = () => { try{ return typeof localStorage !== 'undefined' && localStorage !== null; }catch(e){ return false; } };
-async function isFbReady(){ try{ return await window.fbReady; }catch(e){ return false; } }
+let _fbReadyCache = null;
+async function isFbReady(){
+  if(_fbReadyCache !== null) return _fbReadyCache;
+  // The Firebase module script may not have run yet (module scripts are deferred).
+  // Poll briefly until window.fbReady actually exists, instead of assuming it's missing.
+  let tries = 0;
+  while(typeof window.fbReady === 'undefined' && tries < 100){
+    await new Promise(r=>setTimeout(r, 50));
+    tries++;
+  }
+  if(typeof window.fbReady === 'undefined'){ _fbReadyCache = false; return false; }
+  try{ _fbReadyCache = await window.fbReady; }catch(e){ _fbReadyCache = false; }
+  return _fbReadyCache;
+}
 
 async function storeGet(key){
   if(await isFbReady()){
