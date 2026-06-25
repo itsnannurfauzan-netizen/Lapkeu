@@ -299,15 +299,21 @@
 
   const COLLECTION = 'lpj_data';
   let db = null;
+  window.fbError = null;
 
   window.fbReady = new Promise((resolve)=>{
-    if(!firebaseConfig.apiKey || firebaseConfig.apiKey.indexOf('GANTI')===0){ resolve(false); return; }
+    if(!firebaseConfig.apiKey || firebaseConfig.apiKey.indexOf('GANTI')===0){
+      window.fbError = 'Config belum diisi';
+      resolve(false); return;
+    }
     try{
       const app = initializeApp(firebaseConfig);
       db = getFirestore(app);
       const auth = getAuth(app);
-      signInAnonymously(auth).then(()=>resolve(true)).catch(()=>resolve(false));
-    }catch(e){ resolve(false); }
+      signInAnonymously(auth)
+        .then(()=>resolve(true))
+        .catch((err)=>{ window.fbError = 'Auth gagal: ' + (err && err.code ? err.code : err); resolve(false); });
+    }catch(e){ window.fbError = 'Init gagal: ' + e.message; resolve(false); }
   });
 
   window.fb = {
@@ -471,7 +477,7 @@ let editingId = null;
 
 const fmt = n => 'Rp ' + Math.round(n).toLocaleString('id-ID');
 const toastEl = document.getElementById('toast');
-function toast(msg){ toastEl.textContent = msg; toastEl.classList.add('show'); setTimeout(()=>toastEl.classList.remove('show'), 1800); }
+function toast(msg, ms){ toastEl.textContent = msg; toastEl.classList.add('show'); clearTimeout(toast._t); toast._t = setTimeout(()=>toastEl.classList.remove('show'), ms || 1800); }
 
 function categorize(ket){
   const k = ket.toLowerCase();
@@ -573,7 +579,10 @@ const MIGRATION_FLAG = 'lpj_fb_migrated_v1';
 async function runOneTimeMigration(){
   if(!hasLocalStorage()) return;
   try{ if(localStorage.getItem(MIGRATION_FLAG)) return; }catch(e){ return; }
-  if(!(await isFbReady())) return; // Firebase not configured yet; nothing to migrate to.
+  if(!(await isFbReady())){
+    toast('Sinkronisasi belum aktif: ' + (window.fbError || 'tidak diketahui'), 8000);
+    return;
+  }
 
   try{
     const rawKasList = localStorage.getItem(KAS_LIST_KEY);
@@ -608,7 +617,7 @@ async function runOneTimeMigration(){
 
     localStorage.setItem(MIGRATION_FLAG, '1');
     toast('Data lama berhasil dipindahkan ke server bersama');
-  }catch(e){ /* leave flag unset so migration retries on next load */ }
+  }catch(e){ toast('Migrasi gagal: ' + e.message, 8000); }
 }
 
 async function loadKasList(){
