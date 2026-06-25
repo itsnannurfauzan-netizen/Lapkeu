@@ -281,6 +281,57 @@
   }
 </style>
 </head>
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+  import { getFirestore, doc, getDoc, setDoc, deleteDoc, collection, query, where, getDocs, onSnapshot, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+  import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+
+  // ====== firebaseConfig project Lapkeu ======
+  const firebaseConfig = {
+    apiKey: "AIzaSyB44TOd-vibM3_D-MFNt9Bo99zRSOW9NTs",
+    authDomain: "lapkeu-c5230.firebaseapp.com",
+    projectId: "lapkeu-c5230",
+    storageBucket: "lapkeu-c5230.firebasestorage.app",
+    messagingSenderId: "22078351565",
+    appId: "1:22078351565:web:f76dd1f674e75535eda184"
+  };
+  // ======================================================================
+
+  const COLLECTION = 'lpj_data';
+  let db = null;
+
+  window.fbReady = new Promise((resolve)=>{
+    if(!firebaseConfig.apiKey || firebaseConfig.apiKey.indexOf('GANTI')===0){ resolve(false); return; }
+    try{
+      const app = initializeApp(firebaseConfig);
+      db = getFirestore(app);
+      const auth = getAuth(app);
+      signInAnonymously(auth).then(()=>resolve(true)).catch(()=>resolve(false));
+    }catch(e){ resolve(false); }
+  });
+
+  window.fb = {
+    async getDoc(key){
+      const snap = await getDoc(doc(db, COLLECTION, key));
+      return snap.exists() ? snap.data().value : null;
+    },
+    async setDoc(key, value){
+      await setDoc(doc(db, COLLECTION, key), { value, updatedAt: serverTimestamp() });
+    },
+    async deleteDoc(key){
+      try{ await deleteDoc(doc(db, COLLECTION, key)); }catch(e){}
+    },
+    async listPrefix(prefix){
+      const end = prefix + '\uf8ff';
+      const q = query(collection(db, COLLECTION), where('__name__','>=', prefix), where('__name__','<', end));
+      const snap = await getDocs(q);
+      return snap.docs.map(d=>d.id);
+    },
+    onDoc(key, cb){
+      return onSnapshot(doc(db, COLLECTION, key), (snap)=>{ cb(snap.exists() ? snap.data().value : null); }, ()=>{});
+    }
+  };
+</script>
 <body>
 <div class="app" id="app">
 <div class="main-wrap">
@@ -435,8 +486,12 @@ function categorize(ket){
 
 const hasNativeStorage = () => typeof window !== 'undefined' && window.storage && typeof window.storage.get === 'function';
 const hasLocalStorage = () => { try{ return typeof localStorage !== 'undefined' && localStorage !== null; }catch(e){ return false; } };
+async function isFbReady(){ try{ return await window.fbReady; }catch(e){ return false; } }
 
 async function storeGet(key){
+  if(await isFbReady()){
+    try{ const v = await window.fb.getDoc(key); if(v!==null && v!==undefined) return v; }catch(e){}
+  }
   if(hasNativeStorage()){
     try{ const r = await window.storage.get(key, false); return (r && r.value) || null; }catch(e){ return null; }
   }
@@ -444,6 +499,9 @@ async function storeGet(key){
   return null;
 }
 async function storeSet(key, value){
+  if(await isFbReady()){
+    try{ await window.fb.setDoc(key, value); return true; }catch(e){ /* fall through */ }
+  }
   if(hasNativeStorage()){
     try{ await window.storage.set(key, value, false); return true; }catch(e){ /* fall through */ }
   }
@@ -451,10 +509,14 @@ async function storeSet(key, value){
   return false;
 }
 async function storeDelete(key){
+  if(await isFbReady()){ try{ await window.fb.deleteDoc(key); }catch(e){} }
   if(hasNativeStorage()){ try{ await window.storage.delete(key, false); }catch(e){} }
   if(hasLocalStorage()){ try{ localStorage.removeItem(key); }catch(e){} }
 }
 async function storeListPrefix(prefix){
+  if(await isFbReady()){
+    try{ return await window.fb.listPrefix(prefix); }catch(e){ return []; }
+  }
   if(hasNativeStorage()){
     try{ const r = await window.storage.list(prefix, false); return (r && r.keys) || []; }catch(e){ return []; }
   }
@@ -468,6 +530,87 @@ async function storeListPrefix(prefix){
   return [];
 }
 
+// ===== Live cross-device sync (only active when Firebase is configured) =====
+let unsubTx = null, unsubSaldo = null, unsubKasList = null;
+
+async function subscribeLive(){
+  if(!(await isFbReady())) return;
+  if(unsubTx) { unsubTx(); unsubTx = null; }
+  if(unsubSaldo) { unsubSaldo(); unsubSaldo = null; }
+  unsubTx = window.fb.onDoc(storeKeyFor(activeKasId), (val)=>{
+    if(val){ try{ transactions = JSON.parse(val); render(); }catch(e){} }
+  });
+  unsubSaldo = window.fb.onDoc(saldoJagoKeyFor(activeKasId), (val)=>{
+    if(val){ try{ saldoJago = JSON.parse(val); render(); }catch(e){} }
+  });
+}
+
+async function subscribeKasList(){
+  if(!(await isFbReady())) return;
+  if(unsubKasList) { unsubKasList(); unsubKasList = null; }
+  unsubKasList = window.fb.onDoc(KAS_LIST_KEY, (val)=>{
+    if(val){
+      try{
+        kasList = JSON.parse(val);
+        if(!kasList.find(k=>k.id===activeKasId) && kasList[0]) switchKas(kasList[0].id);
+        else renderKasBar();
+      }catch(e){}
+    }
+  });
+}
+
+// Active kas selection stays per-device (not synced) so each person can browse a different kas.
+function loadActiveKasIdLocal(){
+  try{ const v = localStorage.getItem(ACTIVE_KAS_KEY); return v ? JSON.parse(v) : null; }catch(e){ return null; }
+}
+function saveActiveKasIdLocal(id){
+  try{ localStorage.setItem(ACTIVE_KAS_KEY, JSON.stringify(id)); }catch(e){}
+}
+
+// ===== One-time migration: push any data already saved locally on this device up to Firebase =====
+const MIGRATION_FLAG = 'lpj_fb_migrated_v1';
+
+async function runOneTimeMigration(){
+  if(!hasLocalStorage()) return;
+  try{ if(localStorage.getItem(MIGRATION_FLAG)) return; }catch(e){ return; }
+  if(!(await isFbReady())) return; // Firebase not configured yet; nothing to migrate to.
+
+  try{
+    const rawKasList = localStorage.getItem(KAS_LIST_KEY);
+    let localKasList = null;
+    if(rawKasList){ try{ localKasList = JSON.parse(rawKasList); }catch(e){} }
+    if(!localKasList || !localKasList.length){
+      localKasList = [{id: DEFAULT_KAS_ID, name: 'Kantong Survey'}];
+    }
+
+    await window.fb.setDoc(KAS_LIST_KEY, JSON.stringify(localKasList));
+
+    for(const k of localKasList){
+      const txKey = storeKeyFor(k.id);
+      const saldoKey = saldoJagoKeyFor(k.id);
+      const rawTx = localStorage.getItem(txKey);
+      if(rawTx){
+        await window.fb.setDoc(txKey, rawTx);
+        try{
+          const txs = JSON.parse(rawTx);
+          for(const t of txs){
+            if(t.hasPhoto){
+              const pKey = photoKey(k.id, t.id);
+              const pVal = localStorage.getItem(pKey);
+              if(pVal){ await window.fb.setDoc(pKey, pVal); }
+            }
+          }
+        }catch(e){}
+      }
+      const rawSaldo = localStorage.getItem(saldoKey);
+      if(rawSaldo){ await window.fb.setDoc(saldoKey, rawSaldo); }
+    }
+
+    localStorage.setItem(MIGRATION_FLAG, '1');
+    toast('Data lama berhasil dipindahkan ke server bersama');
+  }catch(e){ /* leave flag unset so migration retries on next load */ }
+}
+
 async function loadKasList(){
   const raw = await storeGet(KAS_LIST_KEY);
   if(raw){
@@ -476,13 +619,13 @@ async function loadKasList(){
     kasList = [{id: DEFAULT_KAS_ID, name: 'Kantong Survey'}];
     await storeSet(KAS_LIST_KEY, JSON.stringify(kasList));
   }
-  const rawActive = await storeGet(ACTIVE_KAS_KEY);
-  activeKasId = rawActive ? JSON.parse(rawActive) : DEFAULT_KAS_ID;
+  const localActive = loadActiveKasIdLocal();
+  activeKasId = localActive || DEFAULT_KAS_ID;
   if(!kasList.find(k=>k.id===activeKasId)) activeKasId = (kasList[0] && kasList[0].id) || DEFAULT_KAS_ID;
 }
 
 async function persistKasList(){ await storeSet(KAS_LIST_KEY, JSON.stringify(kasList)); }
-async function persistActiveKasId(){ await storeSet(ACTIVE_KAS_KEY, JSON.stringify(activeKasId)); }
+async function persistActiveKasId(){ saveActiveKasIdLocal(activeKasId); }
 
 async function loadData(){
   // Default kas falls back to the original seeded data; other kas start empty.
@@ -499,6 +642,7 @@ async function loadData(){
 
   renderKasBar();
   render();
+  await subscribeLive();
 }
 
 async function persist(){
@@ -736,7 +880,15 @@ function compressImage(file){
         const canvas = document.createElement('canvas');
         canvas.width = w; canvas.height = h;
         canvas.getContext('2d').drawImage(img, 0, 0, w, h);
-        resolve(canvas.toDataURL('image/jpeg', 0.7));
+        let quality = 0.72;
+        let out = canvas.toDataURL('image/jpeg', quality);
+        // Keep comfortably under Firestore's 1MB-per-document limit.
+        while(out.length > 850000 && quality > 0.3){
+          quality -= 0.12;
+          out = canvas.toDataURL('image/jpeg', quality);
+        }
+        if(out.length > 950000){ reject(new Error('Foto masih terlalu besar')); return; }
+        resolve(out);
       };
       img.onerror = ()=>reject(new Error('Gagal membaca gambar'));
       img.src = e.target.result;
@@ -937,8 +1089,10 @@ document.getElementById('btnExport').addEventListener('click', async ()=>{
 document.getElementById('btnPrint').addEventListener('click', ()=> window.print());
 
 (async function init(){
+  await runOneTimeMigration();
   await loadKasList();
   await loadData();
+  await subscribeKasList();
 })();
 </script>
 </body>
