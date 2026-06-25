@@ -107,6 +107,20 @@
   .cat-bar{height:4px; background:var(--paper-2); border-radius:3px; margin-top:7px; overflow:hidden;}
   .cat-bar i{display:block; height:100%; background:var(--gold);}
 
+  .cabang-scroll{display:flex; gap:8px; overflow-x:auto; padding-bottom:4px; -ms-overflow-style:none; scrollbar-width:none;}
+  .cabang-scroll::-webkit-scrollbar{display:none;}
+  .cabang-chip{
+    flex:0 0 auto; min-width:128px; background:#fff; border:1px solid var(--line); border-radius:12px;
+    padding:9px 12px; box-shadow:var(--shadow); position:relative; cursor:pointer;
+  }
+  .cabang-chip .cc-name{font-size:12px; color:var(--ink); font-weight:600; padding-right:14px;}
+  .cabang-chip .cc-amt{font-family:'IBM Plex Mono',monospace; font-size:12.5px; font-weight:600; margin-top:4px; color:var(--green);}
+  .cabang-chip .cc-del{position:absolute; top:7px; right:8px; font-size:10px; color:var(--ink-soft); padding:2px;}
+  .cabang-chip.cabang-add{
+    display:flex; align-items:center; justify-content:center; color:var(--ink-soft); font-weight:600; font-size:12px;
+    background:none; border:1.5px dashed var(--line); box-shadow:none;
+  }
+
   /* search & filter */
   .toolbar{display:flex; gap:8px; margin-top:4px;}
   .search-wrap{
@@ -181,6 +195,11 @@
   .field{margin-bottom:8px;}
   .field-row{display:grid; grid-template-columns:1fr 1fr; gap:8px;}
   .field label{font-size:10.5px; font-weight:600; color:var(--ink-soft); text-transform:uppercase; letter-spacing:.04em;}
+  .talangan-label{
+    display:flex; align-items:center; gap:8px; cursor:pointer; padding:8px 10px; background:#fff;
+    border:1px solid var(--line); border-radius:9px; text-transform:none; font-size:12.5px; color:var(--ink); font-weight:600;
+  }
+  .talangan-label input[type="checkbox"]{width:16px; height:16px; margin:0; accent-color:var(--gold); flex:0 0 auto;}
   .field input, .field select, .field textarea{
     width:100%; margin-top:4px; padding:8px 10px; border:1px solid var(--line); border-radius:9px;
     font-size:14px; font-family:'Inter',sans-serif; background:#fff; color:var(--ink);
@@ -223,6 +242,14 @@
   .photo-actions .danger{color:var(--red);}
   .photo-spin{font-size:11.5px; color:var(--ink-soft); text-align:center; padding:8px;}
   .tag.photo{background:var(--green-soft); color:var(--green);}
+  .tag.talangan{background:#FBE9D0; color:var(--gold);}
+
+  .talangan-stats{display:grid; grid-template-columns:repeat(auto-fit, minmax(110px,1fr)); gap:8px;}
+  .talangan-stats .ts-box{background:#fff; border:1px solid var(--line); border-radius:12px; padding:10px 11px; box-shadow:var(--shadow);}
+  .talangan-stats .ts-lbl{font-size:10.5px; color:var(--ink-soft); font-weight:600;}
+  .talangan-stats .ts-val{font-family:'IBM Plex Mono',monospace; font-size:13px; font-weight:600; margin-top:4px; color:var(--ink);}
+  .talangan-stats .ts-val.warn{color:var(--gold);}
+  .talangan-empty{font-size:12px; color:var(--ink-soft); grid-column:1/-1;}
 
   .lightbox{
     position:fixed; inset:0; background:rgba(10,14,14,.92); z-index:90; display:none;
@@ -269,6 +296,8 @@
     .kas-bar{ flex-wrap:wrap; }
     .cat-scroll{ flex-wrap:wrap; overflow-x:visible; }
     .cat-card{ flex:1 1 160px; min-width:160px; }
+    .cabang-scroll{ flex-wrap:wrap; overflow-x:visible; }
+    .cabang-chip{ flex:1 1 160px; min-width:160px; }
     .footer-actions{ padding-bottom:36px; }
     .overlay{ align-items:center; background:rgba(20,28,28,.45); }
     .sheet{ max-width:480px; border-radius:18px; animation:popIn .18s ease; }
@@ -374,6 +403,17 @@
   </div>
 
   <div class="section">
+    <div class="section-title">Daftar Cabang & Budget Survey <span class="hint">otomatis</span></div>
+    <div class="cabang-scroll" id="cabangScroll"></div>
+    <div id="cabangSummary" style="font-size:12px; color:var(--ink-soft); margin-top:8px; line-height:1.5;"></div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Dana Talangan <span class="hint">otomatis</span></div>
+    <div class="talangan-stats" id="talanganStats"></div>
+  </div>
+
+  <div class="section">
     <div class="section-title">Rekap per Kategori <span class="hint">otomatis</span></div>
     <div class="cat-scroll" id="catScroll"></div>
   </div>
@@ -391,6 +431,7 @@
       <div class="chip" data-f="in">Masuk</div>
       <div class="chip" data-f="out">Keluar</div>
       <div class="chip" data-f="nobukti">Belum Ada Bukti</div>
+      <div class="chip" data-f="talangan">Dana Talangan</div>
     </div>
   </div>
 
@@ -436,6 +477,12 @@
       <div class="field"><label>Catatan (opsional)</label><input type="text" id="fNote" placeholder="Link bukti, nama PIC, dll"></div>
     </div>
     <div class="field">
+      <label class="talangan-label" for="fTalangan">
+        <input type="checkbox" id="fTalangan">
+        <span>Dana Talangan (dibayar pribadi, akan direimburse)</span>
+      </label>
+    </div>
+    <div class="field">
       <label>Foto Bukti</label>
       <div class="photo-box" id="photoBox">
         <div class="photo-placeholder" id="photoPlaceholder">Belum ada foto</div>
@@ -471,11 +518,14 @@ const ACTIVE_KAS_KEY = 'lpj_active_kas_id';
 const storeKeyFor = id => id===DEFAULT_KAS_ID ? 'lpj_kantong_survey_transactions' : 'lpj_kantong_survey_transactions:'+id;
 const saldoJagoKeyFor = id => id===DEFAULT_KAS_ID ? 'lpj_kantong_survey_saldo_jago' : 'lpj_kantong_survey_saldo_jago:'+id;
 const photoKey = (kasId, txId) => kasId===DEFAULT_KAS_ID ? 'photo:'+txId : 'photo:'+kasId+':'+txId;
+const cabangKeyFor = id => 'lpj_cabang_list:' + id;
 
 let kasList = [{id: DEFAULT_KAS_ID, name: 'Kantong Survey'}];
 let activeKasId = DEFAULT_KAS_ID;
 let transactions = [];
 let saldoJago = 3733700;
+let cabangList = [];
+const DEFAULT_BUDGET_PER_CABANG = 5000000;
 let activeFilter = 'all';
 let searchTerm = '';
 let editingId = null;
@@ -555,17 +605,21 @@ async function storeListPrefix(prefix){
 }
 
 // ===== Live cross-device sync (only active when Firebase is configured) =====
-let unsubTx = null, unsubSaldo = null, unsubKasList = null;
+let unsubTx = null, unsubSaldo = null, unsubKasList = null, unsubCabang = null;
 
 async function subscribeLive(){
   if(!(await isFbReady())) return;
   if(unsubTx) { unsubTx(); unsubTx = null; }
   if(unsubSaldo) { unsubSaldo(); unsubSaldo = null; }
+  if(unsubCabang) { unsubCabang(); unsubCabang = null; }
   unsubTx = window.fb.onDoc(storeKeyFor(activeKasId), (val)=>{
     if(val){ try{ transactions = JSON.parse(val); render(); }catch(e){} }
   });
   unsubSaldo = window.fb.onDoc(saldoJagoKeyFor(activeKasId), (val)=>{
     if(val){ try{ saldoJago = JSON.parse(val); render(); }catch(e){} }
+  });
+  unsubCabang = window.fb.onDoc(cabangKeyFor(activeKasId), (val)=>{
+    try{ cabangList = val ? JSON.parse(val) : []; render(); }catch(e){}
   });
 }
 
@@ -658,6 +712,7 @@ async function loadData(){
   // Default kas falls back to the original seeded data; other kas start empty.
   transactions = activeKasId===DEFAULT_KAS_ID ? SEED.map((t,i)=>({id:'t'+i, ...t})) : [];
   saldoJago = activeKasId===DEFAULT_KAS_ID ? 3733700 : 0;
+  cabangList = [];
 
   const rawTx = await storeGet(storeKeyFor(activeKasId));
   if(rawTx){ try{ transactions = JSON.parse(rawTx); }catch(e){} }
@@ -666,6 +721,9 @@ async function loadData(){
   const rawSaldo = await storeGet(saldoJagoKeyFor(activeKasId));
   if(rawSaldo){ try{ saldoJago = JSON.parse(rawSaldo); }catch(e){} }
   else { await storeSet(saldoJagoKeyFor(activeKasId), JSON.stringify(saldoJago)); }
+
+  const rawCabang = await storeGet(cabangKeyFor(activeKasId));
+  if(rawCabang){ try{ cabangList = JSON.parse(rawCabang); }catch(e){} }
 
   renderKasBar();
   render();
@@ -677,6 +735,7 @@ async function persist(){
   if(!ok) toast('Tersimpan di sesi ini saja (penyimpanan tidak tersedia)');
 }
 async function persistSaldoJago(){ await storeSet(saldoJagoKeyFor(activeKasId), JSON.stringify(saldoJago)); }
+async function persistCabangList(){ await storeSet(cabangKeyFor(activeKasId), JSON.stringify(cabangList)); }
 
 function render(){
   const totalIn = transactions.reduce((s,t)=>s+(t.in||0),0);
@@ -707,7 +766,50 @@ function render(){
   }
 
   renderCategories();
+  renderCabangSection(totalIn);
+  renderTalanganSection();
   renderList();
+}
+
+function renderCabangSection(totalIn){
+  const wrap = document.getElementById('cabangScroll');
+  const totalSeharusnya = cabangList.reduce((s,c)=>s+(c.budget||0),0);
+  const selisihCabang = totalIn - totalSeharusnya;
+
+  wrap.innerHTML = cabangList.map(c=>`
+    <div class="cabang-chip" data-id="${c.id}">
+      <span class="cc-del" data-id="${c.id}">✕</span>
+      <div class="cc-name">${escapeHtml(c.name)}</div>
+      <div class="cc-amt">${fmt(c.budget||0)}</div>
+    </div>
+  `).join('') + '<div class="cabang-chip cabang-add" id="addCabangChip">+ Tambah Cabang</div>';
+
+  const summary = document.getElementById('cabangSummary');
+  if(!cabangList.length){
+    summary.innerHTML = 'Belum ada cabang diinput. Tambahkan cabang untuk menghitung dana masuk yang seharusnya.';
+  } else {
+    const diffLabel = selisihCabang===0 ? 'Sesuai' : (selisihCabang>0 ? '+'+fmt(selisihCabang)+' (lebih dari seharusnya)' : fmt(selisihCabang).replace('Rp -','-Rp ')+' (kurang dari seharusnya)');
+    summary.innerHTML = `Total Masuk Seharusnya (${cabangList.length} cabang): <b>${fmt(totalSeharusnya)}</b> · Selisih dari Total Masuk aktual: <b>${diffLabel}</b>`;
+  }
+}
+
+function renderTalanganSection(){
+  const wrap = document.getElementById('talanganStats');
+  const talanganTx = transactions.filter(t=>t.talangan);
+  const totalKeluar = talanganTx.reduce((s,t)=>s+(t.out||0),0);
+  const totalMasuk = talanganTx.reduce((s,t)=>s+(t.in||0),0);
+  const sisa = totalKeluar - totalMasuk;
+
+  if(!talanganTx.length){
+    wrap.innerHTML = '<div class="talangan-empty">Belum ada transaksi yang ditandai sebagai dana talangan.</div>';
+    return;
+  }
+
+  wrap.innerHTML = `
+    <div class="ts-box"><div class="ts-lbl">Ditalangi (Keluar)</div><div class="ts-val">${fmt(totalKeluar)}</div></div>
+    <div class="ts-box"><div class="ts-lbl">Sudah Direimburse</div><div class="ts-val">${fmt(totalMasuk)}</div></div>
+    <div class="ts-box"><div class="ts-lbl">Sisa Belum Direimburse</div><div class="ts-val ${sisa>0?'warn':''}">${fmt(sisa)}</div></div>
+  `;
 }
 
 function renderCategories(){
@@ -809,11 +911,57 @@ document.getElementById('kasBar').addEventListener('click', async (e)=>{
   else await switchKas(id);
 });
 
+// ===== Cabang (branch) budget list =====
+async function addCabang(){
+  const name = prompt('Nama cabang baru, mis. "Cabang Bandung":');
+  if(!name || !name.trim()) return;
+  const amountStr = prompt('Budget survey untuk cabang ini (Rp):', String(DEFAULT_BUDGET_PER_CABANG));
+  if(amountStr===null) return;
+  const amount = parseFloat(amountStr.replace(/[^0-9]/g,'')) || DEFAULT_BUDGET_PER_CABANG;
+  cabangList.push({ id: 'cb'+Date.now(), name: name.trim(), budget: amount });
+  await persistCabangList();
+  render();
+  toast('Cabang "'+name.trim()+'" ditambahkan');
+}
+
+async function editCabang(id){
+  const c = cabangList.find(x=>x.id===id); if(!c) return;
+  const name = prompt('Nama cabang:', c.name);
+  if(name===null) return;
+  const amountStr = prompt('Budget survey (Rp):', String(c.budget||0));
+  if(amountStr===null) return;
+  const amount = parseFloat(amountStr.replace(/[^0-9]/g,''));
+  if(name.trim()) c.name = name.trim();
+  if(!isNaN(amount)) c.budget = amount;
+  await persistCabangList();
+  render();
+}
+
+async function removeCabang(id){
+  const c = cabangList.find(x=>x.id===id); if(!c) return;
+  if(!confirm('Hapus cabang "'+c.name+'" dari daftar?')) return;
+  cabangList = cabangList.filter(x=>x.id!==id);
+  await persistCabangList();
+  render();
+  toast('Cabang dihapus');
+}
+
+document.getElementById('cabangScroll').addEventListener('click', async (e)=>{
+  const del = e.target.closest('.cc-del');
+  if(del){ e.stopPropagation(); await removeCabang(del.dataset.id); return; }
+  const addChip = e.target.closest('#addCabangChip');
+  if(addChip){ await addCabang(); return; }
+  const chip = e.target.closest('.cabang-chip');
+  if(!chip) return;
+  await editCabang(chip.dataset.id);
+});
+
 function applyFilters(){
   return transactions.filter(t=>{
     if(activeFilter==='in' && !(t.in>0)) return false;
     if(activeFilter==='out' && !(t.out>0)) return false;
     if(activeFilter==='nobukti' && t.bukti!=='Tidak ada') return false;
+    if(activeFilter==='talangan' && !t.talangan) return false;
     if(searchTerm && !t.keterangan.toLowerCase().includes(searchTerm.toLowerCase())) return false;
     return true;
   });
@@ -843,6 +991,7 @@ function renderList(){
             <div class="tx-meta">
               ${t.bukti ? `<span class="tag ${noBukti?'missing':''}">${t.bukti}</span>` : ''}
               ${t.hasPhoto ? `<span class="tag photo">📷 Foto</span>` : ''}
+              ${t.talangan ? `<span class="tag talangan">💸 Talangan</span>` : ''}
               ${t.note ? `<span class="tag">${escapeHtml(t.note.length>28? t.note.slice(0,28)+'…': t.note)}</span>` : ''}
             </div>
           </div>
@@ -1002,6 +1151,7 @@ function openAdd(){
   document.getElementById('fJumlah').value='';
   document.getElementById('fBukti').value='Fisik';
   document.getElementById('fNote').value='';
+  document.getElementById('fTalangan').checked = false;
   document.getElementById('btnDelete').style.display='none';
   setPhotoPreview(null);
   setType('out');
@@ -1019,6 +1169,7 @@ function openEdit(id){
   document.getElementById('fJumlah').value = t.in>0 ? t.in : t.out;
   document.getElementById('fBukti').value = t.bukti || 'Fisik';
   document.getElementById('fNote').value = t.note || '';
+  document.getElementById('fTalangan').checked = !!t.talangan;
   document.getElementById('btnDelete').style.display='inline-block';
   if(t.hasPhoto){ setPhotoLoading(); loadPhotoForPreview(t); } else { setPhotoPreview(t.photo || null); }
   setType(t.in>0 ? 'in':'out');
@@ -1041,7 +1192,8 @@ document.getElementById('btnSave').addEventListener('click', async ()=>{
     tanggal, keterangan,
     in: currentType==='in' ? jumlah : 0,
     out: currentType==='out' ? jumlah : 0,
-    bukti, note
+    bukti, note,
+    talangan: document.getElementById('fTalangan').checked
   };
 
   let targetId;
