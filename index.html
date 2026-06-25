@@ -85,6 +85,10 @@
   }
   .stat-box .lbl{font-size:10.5px; color:#9FB3AB; text-transform:uppercase; letter-spacing:.06em;}
   .stat-box .val{font-family:'IBM Plex Mono',monospace; font-weight:600; font-size:15px; margin-top:3px;}
+  .stat-sub{font-size:10.5px; margin-top:5px; line-height:1.4; font-family:'IBM Plex Mono',monospace;}
+  .stat-sub .ok{color:#8FD6AE;}
+  .stat-sub .warn{color:#F0A98A;}
+  .stat-sub .muted{color:#8AA098;}
   .in-col{color:#8FD6AE;}
   .out-col{color:#EFA98C;}
 
@@ -388,7 +392,11 @@
     </div>
 
     <div class="stat-strip">
-      <div class="stat-box"><div class="lbl">Total Masuk</div><div class="val in-col" id="totalIn">Rp 0</div></div>
+      <div class="stat-box">
+        <div class="lbl">Total Masuk</div>
+        <div class="val in-col" id="totalIn">Rp 0</div>
+        <div class="stat-sub" id="totalInVsSeharusnya"></div>
+      </div>
       <div class="stat-box"><div class="lbl">Total Keluar</div><div class="val out-col" id="totalOut">Rp 0</div></div>
     </div>
   </div>
@@ -763,6 +771,17 @@ function render(){
   } else {
     pill.textContent = (selisih>0?'Kurang catat ':'Lebih catat ') + fmt(Math.abs(selisih));
     pill.className='status-pill status-warn';
+  }
+
+  const totalSeharusnyaCabang = cabangList.reduce((s,c)=>s+(c.budget||0),0);
+  const subEl = document.getElementById('totalInVsSeharusnya');
+  if(!cabangList.length){
+    subEl.innerHTML = '';
+  } else {
+    const diffCabang = totalIn - totalSeharusnyaCabang;
+    const cls = diffCabang===0 ? 'ok' : (diffCabang>0 ? 'ok' : 'warn');
+    const diffTxt = diffCabang===0 ? 'sesuai' : (diffCabang>0 ? '+'+fmt(diffCabang)+' lebih' : fmt(Math.abs(diffCabang))+' kurang');
+    subEl.innerHTML = `Seharusnya ${fmt(totalSeharusnyaCabang)} <span class="${cls}">· ${diffTxt}</span>`;
   }
 
   renderCategories();
